@@ -7,6 +7,8 @@ class ResidualModule(nn.Module):
     def __init__(self, C_in:int=256, C_mid:int=128, C_out:int=256, normalization: Callable=nn.BatchNorm2d):
         super(ResidualModule, self).__init__()
 
+        assert C_in == C_out, f'{C_in} and {C_out} channels are different'
+
         self.block = nn.Sequential(
             normalization(C_in)
             ,nn.GELU()
