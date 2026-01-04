@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from .utils import *
+from models.utils import *
 from typing import Callable
 
 class ResidualModule(nn.Module):
