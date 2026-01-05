@@ -5,9 +5,9 @@ from typing import Tuple
 # Your import style preserved
 from .residual_module import *
 
-class HourglassModuleDown(nn.Module):
+class UnetModuleDown(nn.Module):
     """
-    Downsampling path of the hourglass module.
+    Downsampling path of the unet module.
     """
 
     def __init__(
@@ -15,7 +15,7 @@ class HourglassModuleDown(nn.Module):
             normalization: Callable = nn.BatchNorm2d,
             inner_module: int=1,
     ):
-        super(HourglassModuleDown, self).__init__()
+        super(UnetModuleDown, self).__init__()
 
         self.block1 = nn.Sequential(
             *[ResidualModule(64, 32, 64, normalization) for _ in range(inner_module)]
@@ -61,9 +61,9 @@ class HourglassModuleDown(nn.Module):
 
         return x_64, x_32, x_16, x_8, x_4
 
-class HourglassModuleMiddle(nn.Module):
+class UnetModuleMiddle(nn.Module):
     """
-    Bottleneck (middle) of the hourglass module.
+    Bottleneck (middle) of the unet module.
     """
 
     def __init__(
@@ -71,7 +71,7 @@ class HourglassModuleMiddle(nn.Module):
             normalization: Callable = nn.BatchNorm2d,
             inner_module: int=1,
     ):
-        super(HourglassModuleMiddle, self).__init__()
+        super(UnetModuleMiddle, self).__init__()
 
         self.block = nn.Sequential(
             nn.Sequential(
@@ -95,9 +95,9 @@ class HourglassModuleMiddle(nn.Module):
         """
         return self.block(x)
 
-class HourglassModuleUp(nn.Module):
+class UnetModuleUp(nn.Module):
     """
-    Upsampling path of the hourglass module.
+    Upsampling path of the unet module.
     """
 
     def __init__(
@@ -105,7 +105,7 @@ class HourglassModuleUp(nn.Module):
             normalization: Callable = nn.BatchNorm2d,
             inner_module: int=1,
     ):
-        super(HourglassModuleUp, self).__init__()
+        super(UnetModuleUp, self).__init__()
 
         self.up1 = nn.ConvTranspose2d(1024, 512, kernel_size=2, stride=2)
         self.block1 = nn.Sequential(
@@ -164,19 +164,19 @@ class HourglassModuleUp(nn.Module):
 
         return up
 
-class HourglassModule(nn.Module):
+class UnetModule(nn.Module):
     def __init__(self,
                  normalization: Callable=nn.BatchNorm2d,
                  inner_module: int=1,
         ):
-        super(HourglassModule, self).__init__()
+        super(UnetModule, self).__init__()
 
         self.normalization = normalization
         self.inner_module = inner_module
 
-        self.down = HourglassModuleDown(self.normalization, self.inner_module)
-        self.middle = HourglassModuleMiddle(self.normalization, self.inner_module)
-        self.up = HourglassModuleUp(self.normalization, self.inner_module)
+        self.down = UnetModuleDown(self.normalization, self.inner_module)
+        self.middle = UnetModuleMiddle(self.normalization, self.inner_module)
+        self.up = UnetModuleUp(self.normalization, self.inner_module)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x_64, x_32, x_16, x_8, x_4 = self.down(x)
