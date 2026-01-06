@@ -4,30 +4,10 @@ from typing import Callable, Literal
 from torch.nn import functional as F
 from .unet_module import UnetModule
 from .residual_module import ResidualModule
+from models.utils import DownSample
 
 # Your import style preserved
 from .residual_module import *
-
-class DownSample(nn.Module):
-    def __init__(self, in_channels: int=3, normalization: Callable = nn.BatchNorm2d):
-        super(DownSample, self).__init__()
-
-        self.normalization = normalization
-
-        self.downsample = nn.Sequential(
-            # 640 → 320
-            nn.Identity(in_channels),
-            nn.GELU(),
-            nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1),
-
-            # 320 -> 64
-            self.normalization(32),
-            nn.GELU(),
-            nn.Conv2d(32, 64, kernel_size=5, stride=5, padding=0),
-        )
-
-    def forward(self, x):
-        return self.downsample(x)
 
 class IntermediateResidualModule(nn.Module):
     def __init__(self, normalization: Callable = nn.BatchNorm2d, intermdiate_super: bool = True):
@@ -76,7 +56,7 @@ class StackedUnet(nn.Module):
 
     def forward(self, x):
         x = F.interpolate(x,
-                          size=(640, 640),
+                          size=(512, 512),
                           mode=self.interpolation_mode, # Use 'bilinear' for smooth results
                           align_corners=False)
 
