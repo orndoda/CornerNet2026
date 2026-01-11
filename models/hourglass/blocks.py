@@ -173,32 +173,32 @@ class HourglassBlock(nn.Module):
         # BOTTOM (4 residual blocks)
         # -----------------------------
         self.bottom = nn.Sequential(
-            ResidualBlock(C4, C4//2, C4, 1, normalization, activation, pre_activation),
-            ResidualBlock(C4, C4//2, C4, 1, normalization, activation, pre_activation),
-            ResidualBlock(C4, C4//2, C4, 1, normalization, activation, pre_activation),
-            ResidualBlock(C4, C4//2, C4, 1, normalization, activation, pre_activation),
+            ResidualBlock(C4, C4 // 2, C4, 1, normalization, activation, pre_activation),
+            ResidualBlock(C4, C4 // 2, C4, 1, normalization, activation, pre_activation),
+            ResidualBlock(C4, C4 // 2, C4, 1, normalization, activation, pre_activation),
+            ResidualBlock(C4, C4 // 2, C4, 1, normalization, activation, pre_activation),
         )
 
         # -----------------------------
-        # SKIP REFINEMENT
+        # SKIP PROJECTIONS
         # -----------------------------
+        # Project each down feature to the channels expected by the corresponding UpBlock
         self.skip1 = nn.Sequential(
-            ResidualBlock(C1, C1//2, C1, 1, normalization, activation, pre_activation),
-            ResidualBlock(C1, C1//2, C1, 1, normalization, activation, pre_activation),
+            nn.Upsample(scale_factor=2, mode="nearest"),
+            nn.Conv2d(C1, C0, 1, bias=False),
         )
         self.skip2 = nn.Sequential(
-            ResidualBlock(C2, C2//2, C2, 1, normalization, activation, pre_activation),
-            ResidualBlock(C2, C2//2, C2, 1, normalization, activation, pre_activation),
+            nn.Upsample(scale_factor=2, mode="nearest"),
+            nn.Conv2d(C2, C1, 1, bias=False),
         )
         self.skip3 = nn.Sequential(
-            ResidualBlock(C3, C3//2, C3, 1, normalization, activation, pre_activation),
-            ResidualBlock(C3, C3//2, C3, 1, normalization, activation, pre_activation),
+            nn.Upsample(scale_factor=2, mode="nearest"),
+            nn.Conv2d(C3, C2, 1, bias=False),
         )
         self.skip4 = nn.Sequential(
-            ResidualBlock(C4, C4//2, C4, 1, normalization, activation, pre_activation),
-            ResidualBlock(C4, C4//2, C4, 1, normalization, activation, pre_activation),
+            nn.Upsample(scale_factor=2, mode="nearest"),
+            nn.Conv2d(C4, C3, 1, bias=False),
         )
-
         # -----------------------------
         # UP PATH
         # -----------------------------
@@ -209,18 +209,18 @@ class HourglassBlock(nn.Module):
 
     def forward(self, x):
         # Down path
-        d1 = self.down1(x)   # 384
-        d2 = self.down2(d1)  # 384
-        d3 = self.down3(d2)  # 384
-        d4 = self.down4(d3)  # 512
+        d1 = self.down1(x)   # C1 (384)
+        d2 = self.down2(d1)  # C2 (384)
+        d3 = self.down3(d2)  # C3 (384)
+        d4 = self.down4(d3)  # C4 (512)
 
         # Bottom
-        b = self.bottom(d4)
+        b = self.bottom(d4)  # C4 (512)
 
-        # Up path
-        u4 = self.up4(b, self.skip4(d4))  # 384
-        u3 = self.up3(u4, self.skip3(d3)) # 384
-        u2 = self.up2(u3, self.skip2(d2)) # 384
-        u1 = self.up1(u2, self.skip1(d1)) # 256
+        # Up path (note corrected skip tensors)
+        u4 = self.up4(b,  self.skip4(d4))  # -> C3 (384)
+        u3 = self.up3(u4, self.skip3(d3))  # -> C2 (384)
+        u2 = self.up2(u3, self.skip2(d2))  # -> C1 (384)
+        u1 = self.up1(u2, self.skip1(d1))  # -> C0 (256)
 
         return u1
