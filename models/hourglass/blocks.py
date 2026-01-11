@@ -143,3 +143,84 @@ class UpBlock(nn.Module):
     def forward(self, x, skip):
         x = self.upsample(x)
         return self.block(x) + skip
+
+class HourglassBlock(nn.Module):
+    def __init__(
+        self,
+        normalization: Callable[[int], nn.Module] = nn.BatchNorm2d,
+        activation: Callable[[], nn.Module] = nn.ReLU,
+        pre_activation: bool = False,
+        upsample_mode: Literal["nearest", "deconv"] = "nearest",
+    ):
+        super(HourglassBlock, self).__init__()
+
+        # Channel progression
+        C0 = 256
+        C1 = 384
+        C2 = 384
+        C3 = 384
+        C4 = 512
+
+        # -----------------------------
+        # DOWN PATH
+        # -----------------------------
+        self.down1 = DownBlock(C0, C1, normalization, activation, pre_activation)
+        self.down2 = DownBlock(C1, C2, normalization, activation, pre_activation)
+        self.down3 = DownBlock(C2, C3, normalization, activation, pre_activation)
+        self.down4 = DownBlock(C3, C4, normalization, activation, pre_activation)
+
+        # -----------------------------
+        # BOTTOM (4 residual blocks)
+        # -----------------------------
+        self.bottom = nn.Sequential(
+            ResidualBlock(C4, C4//2, C4, 1, normalization, activation, pre_activation),
+            ResidualBlock(C4, C4//2, C4, 1, normalization, activation, pre_activation),
+            ResidualBlock(C4, C4//2, C4, 1, normalization, activation, pre_activation),
+            ResidualBlock(C4, C4//2, C4, 1, normalization, activation, pre_activation),
+        )
+
+        # -----------------------------
+        # SKIP REFINEMENT
+        # -----------------------------
+        self.skip1 = nn.Sequential(
+            ResidualBlock(C1, C1//2, C1, 1, normalization, activation, pre_activation),
+            ResidualBlock(C1, C1//2, C1, 1, normalization, activation, pre_activation),
+        )
+        self.skip2 = nn.Sequential(
+            ResidualBlock(C2, C2//2, C2, 1, normalization, activation, pre_activation),
+            ResidualBlock(C2, C2//2, C2, 1, normalization, activation, pre_activation),
+        )
+        self.skip3 = nn.Sequential(
+            ResidualBlock(C3, C3//2, C3, 1, normalization, activation, pre_activation),
+            ResidualBlock(C3, C3//2, C3, 1, normalization, activation, pre_activation),
+        )
+        self.skip4 = nn.Sequential(
+            ResidualBlock(C4, C4//2, C4, 1, normalization, activation, pre_activation),
+            ResidualBlock(C4, C4//2, C4, 1, normalization, activation, pre_activation),
+        )
+
+        # -----------------------------
+        # UP PATH
+        # -----------------------------
+        self.up4 = UpBlock(C4, C3, normalization, activation, pre_activation, upsample_mode)
+        self.up3 = UpBlock(C3, C2, normalization, activation, pre_activation, upsample_mode)
+        self.up2 = UpBlock(C2, C1, normalization, activation, pre_activation, upsample_mode)
+        self.up1 = UpBlock(C1, C0, normalization, activation, pre_activation, upsample_mode)
+
+    def forward(self, x):
+        # Down path
+        d1 = self.down1(x)   # 384
+        d2 = self.down2(d1)  # 384
+        d3 = self.down3(d2)  # 384
+        d4 = self.down4(d3)  # 512
+
+        # Bottom
+        b = self.bottom(d4)
+
+        # Up path
+        u4 = self.up4(b, self.skip4(d4))  # 384
+        u3 = self.up3(u4, self.skip3(d3)) # 384
+        u2 = self.up2(u3, self.skip2(d2)) # 384
+        u1 = self.up1(u2, self.skip1(d1)) # 256
+
+        return u1
